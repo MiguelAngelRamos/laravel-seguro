@@ -4,6 +4,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookController;
+use App\Http\Controllers\MetricsController; // Importar el controlador de métricas
+
+Route::get('/metrics', [MetricsController::class, '__invoke']);
 
 // Rutas de autenticación
 Route::post('register', [AuthController::class, 'register']);

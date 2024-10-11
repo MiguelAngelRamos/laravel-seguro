@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use PragmaRX\Google2FA\Google2FA;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-
+use Prometheus\CollectorRegistry;
 /**
  * @OA\Info(
  *     title="API REST con JWT y MFA",
@@ -76,6 +76,10 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
+          // Contador de usuarios registrados
+        $registry = app(CollectorRegistry::class);
+        $counter = $registry->getOrRegisterCounter('app', 'user_registrations_total', 'Total de usuarios registrados');
+        $counter->inc(); // Incrementar el contador en 1
         // Autenticar el usuario y generar el token JWT
         $token = JWTAuth::fromUser($user);
         // Devolver el token JWT al usuario después del registro
@@ -115,9 +119,17 @@ class AuthController extends Controller
         $credentials = $request->only('email', 'password');
 
         if (!$token = auth('api')->attempt($credentials)) {
+             // Contador de inicios de sesión fallidos
+            $registry = app(CollectorRegistry::class); // sirve para registrar métricas
+            $failedCounter = $registry->getOrRegisterCounter('app', 'failed_logins_total', 'Total de inicios de sesión fallidos');
+            $failedCounter->inc(); // Incrementar el contador en 1
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        // Contador de inicios de sesión exitosos
+        $registry = app(CollectorRegistry::class);
+        $counter = $registry->getOrRegisterCounter('app', 'successful_logins_total', 'Total de inicios de sesión exitosos');
+        $counter->inc(); // Incrementar el contador en 1
         $user = auth('api')->user();
 
         // Si MFA ya está habilitado para este usuario, requerimos MFA
