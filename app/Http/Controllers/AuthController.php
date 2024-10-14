@@ -119,7 +119,7 @@ class AuthController extends Controller
         $credentials = $request->only('email', 'password');
 
         if (!$token = auth('api')->attempt($credentials)) {
-             // Contador de inicios de sesión fallidos
+            // Contador de inicios de sesión fallidos
             $registry = app(CollectorRegistry::class); // sirve para registrar métricas
             $failedCounter = $registry->getOrRegisterCounter('app', 'failed_logins_total', 'Total de inicios de sesión fallidos');
             $failedCounter->inc(); // Incrementar el contador en 1
@@ -134,19 +134,20 @@ class AuthController extends Controller
 
         // Si MFA ya está habilitado para este usuario, requerimos MFA
         if ($user->google2fa_secret && $user->mfa_enabled) {
+            // Generar el token JWT en una cookie segura
+            $cookie = cookie('token', $token, auth('api')->factory()->getTTL(), '/', null, true, true, false, 'Strict');
+
             return response()->json([
                 'message' => 'MFA required',
                 'mfa_required' => true,
-                'access_token' => $token,
-                'token_type' => 'bearer',
-                'expires_in' => auth('api')->factory()->getTTL() * 60,
                 'user' => $user,
-            ]);
+            ])->withCookie($cookie);
         }
 
-        // Si no tiene MFA habilitado, se responde con el token JWT directamente
-        return $this->respondWithToken($token);
+        // Si no tiene MFA habilitado, se responde con el token JWT directamente en la cookie
+        return $this->respondWithTokenInCookie($token);
     }
+
     // Método para activar MFA desde el perfil del usuario
     /**
      * @OA\Post(
@@ -229,7 +230,7 @@ class AuthController extends Controller
         if ($valid) {
             // Si el MFA es válido, generar un nuevo token JWT
             $token = auth('api')->refresh();
-            return $this->respondWithToken($token);
+            return $this->respondWithTokenInCookie($token);  // Enviar el token en una cookie segura
         }
 
         return response()->json(['error' => 'Invalid MFA code'], 401);
@@ -326,6 +327,18 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Contraseña actualizada exitosamente. Por favor, inicia sesión nuevamente.']);
     }
+    // logout
+    public function logout()
+    {
+        // Invalidar el token actual
+        auth()->logout();
+
+        // Eliminar la cookie configurando una expiración negativa
+        $cookie = cookie('token', '', -1, '/', null, true, true, false, 'Strict');
+
+        return response()->json(['message' => 'Successfully logged out'])->withCookie($cookie);
+    }
+
 
 
     // Método para responder con el token JWT
@@ -337,4 +350,17 @@ class AuthController extends Controller
             'expires_in' => auth('api')->factory()->getTTL() * 60,
         ]);
     }
+
+    // Método para devolver el token JWT dentro de una cookie segura
+    protected function respondWithTokenInCookie($token)
+    {
+        // Configurar la cookie con el token JWT
+        $cookie = cookie('token', $token, auth('api')->factory()->getTTL(), '/', null, true, true, false, 'Strict');
+
+        return response()->json([
+            'message' => 'Login successful',
+            'expires_in' => auth('api')->factory()->getTTL() * 60,
+        ])->withCookie($cookie);  // Devolver la cookie junto con la respuesta
+    }
+
 }

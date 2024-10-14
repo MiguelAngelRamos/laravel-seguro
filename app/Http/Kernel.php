@@ -67,5 +67,6 @@ class Kernel extends HttpKernel
         '2fa' => \PragmaRX\Google2FALaravel\Middleware::class,
         'login.throttle' => \App\Http\Middleware\LoginThrottle::class, // Aquí añadimos el middleware personalizado
         'role' => \App\Http\Middleware\RoleMiddleware::class,
+        'jwt.cookie' => \App\Http\Middleware\CookieToJwtMiddleware::class,
     ];
 }
